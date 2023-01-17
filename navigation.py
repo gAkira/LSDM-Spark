@@ -52,6 +52,27 @@ def q3():
 ---- Question 3 -----------------------------------------------------------
 • What is the distribution of the number of jobs/tasks per scheduling class? 
 """)
+    jobSchedulingClass = columnIndex['jobEvents']['scheduling class']
+    jobID = columnIndex['jobEvents']['job ID']
+
+    # select jobsID and scheduling classes, group by joID and select minimum scheduling class
+    jobsBySC = jobEvents.map(lambda x: (int(x[jobID]), int(x[jobSchedulingClass]))).groupByKey().map(lambda x: (x[0], min(x[1])))
+    # count jobs occurences
+    jobsDistribuition = jobsBySC.map(lambda x: (x[1], 1)).reduceByKey(lambda a,b: a + b).collect()
+
+    for sc, count in sorted(jobsDistribuition):
+        print(f"\t{count} jobs of scheduling class: {sc}")
+    
+    print("")
+    taskSchedulingClass = columnIndex['taskEvents']['scheduling class']
+    taskIndex = columnIndex['taskEvents']['task index']
+    
+    # select task index and scheduling classes, group by task index and select minimum scheduling class
+    tasksBySC = taskEvents.map(lambda x: (int(x[taskIndex]), int(x[taskSchedulingClass]))).groupByKey().map(lambda x: (x[0], min(x[1])))
+    # count tasks occurences
+    tasksDistribuition = tasksBySC.map(lambda x: (x[1], 1)).reduceByKey(lambda a,b: a + b).collect()
+    for sc, count in sorted(tasksDistribuition):
+        print(f"\t{count} tasks of scheduling class: {sc}")
 
 
 def q4():
@@ -106,9 +127,9 @@ if __name__ == "__main__":
 
     q1()
     #q2()
-    #q3()
+    q3()
     #q4()
-    q5()
+    #q5()
     #q6()
     #q7()
 

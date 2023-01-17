@@ -1,5 +1,6 @@
 from pyspark import SparkContext
 from schema import *
+from statistics import mode, mean
 
 #### Driver program
 
@@ -39,38 +40,76 @@ def q1():
         print(f"\t{count} machines with {capacity*100:.0f}% of CPU capacity")
 
 
-# print("""
-# ---- Question 2 -----------------------------------------------------------
-# • What is the percentage of computational power lost due to maintenance (a machine went offline and reconnected later)?
-# """)
+def q2():
+    print("""
+---- Question 2 -----------------------------------------------------------
+• What is the percentage of computational power lost due to maintenance (a machine went offline and reconnected later)?
+""")
 
-# print("""
-# ---- Question 3 -----------------------------------------------------------
-# • What is the distribution of the number of jobs/tasks per scheduling class? 
-# """)
 
-# print("""
-# ---- Question 4 -----------------------------------------------------------
-# • Do tasks with a low scheduling class have a higher probability of being evicted?
-# """)
+def q3():
+    print("""
+---- Question 3 -----------------------------------------------------------
+• What is the distribution of the number of jobs/tasks per scheduling class? 
+""")
 
-# print("""
-# ---- Question 5 -----------------------------------------------------------
-# • In general, do tasks from the same job run on the same machine?
-# """)
 
-# print("""
-# ---- Question 6 -----------------------------------------------------------
-# • Are the tasks that request the more resources the one that consume the more resources?
-# """)
+def q4():
+    print("""
+---- Question 4 -----------------------------------------------------------
+• Do tasks with a low scheduling class have a higher probability of being evicted?
+""")
 
-# print("""
-# ---- Question 7 -----------------------------------------------------------
-# • Can we observe correlations between peaks of high resource consumption on some machines and task eviction events?
-# """)
+
+def q5():
+    print("""
+---- Question 5 -----------------------------------------------------------
+• In general, do tasks from the same job run on the same machine?
+""")
+    jobID = columnIndex['taskUsage']['job ID']
+    machineID = columnIndex['taskUsage']['machine ID']
+
+    # list of distinct job IDs (you can use [:10] to get a sample of 10 jobs, for exemple)
+    distinctJobs = taskUsage.map(lambda x: x[jobID]).distinct().collect()
+    # store percentage of tasks running on the same machine
+    tasksSameMachine = []
+    # for each job, return list of machines being used for the tasks
+    for job in distinctJobs:
+        machinesRunningJob = taskUsage.filter(lambda x: x[jobID] == job).map(lambda x: int(x[machineID])).collect()
+        # append the percentage of same machines being used (mode) over all the machines
+        tasksSameMachine.append(machinesRunningJob.count(mode(machinesRunningJob)) / len(machinesRunningJob))
+    
+    # average usage of the same machine
+    meanPerJob = mean(tasksSameMachine)
+    if meanPerJob > 0.5:
+        print(f"\tYes", end='')
+    else:
+        print(f"\tNo", end='')
+    print(f", usually {round(meanPerJob*100, 2)}% of tasks run on the same machine")
+
+
+def q6():
+    print("""
+---- Question 6 -----------------------------------------------------------
+• Are the tasks that request the more resources the one that consume the more resources?
+""")
+
+
+def q7():
+    print("""
+---- Question 7 -----------------------------------------------------------
+• Can we observe correlations between peaks of high resource consumption on some machines and task eviction events?
+""")
+
 
 if __name__ == "__main__":
 
     q1()
+    #q2()
+    #q3()
+    #q4()
+    q5()
+    #q6()
+    #q7()
 
     input("Press Enter to continue...")

@@ -2,6 +2,13 @@ echo "---------------- AVAILABLE DATA -----------------------"
 gsutil ls gs://clusterdata-2011-2/
 
 echo "---------------- DOWNLOADING SAMPLE -------------------"
+mkdir -p ./data/job_events
+mkdir -p ./data/machine_attributes
+mkdir -p ./data/machine_events
+mkdir -p ./data/task_constraints
+mkdir -p ./data/task_events
+mkdir -p ./data/task_usage
+
 gsutil cp gs://clusterdata-2011-2/README ./data/
 
 gsutil cp gs://clusterdata-2011-2/schema.csv ./data/

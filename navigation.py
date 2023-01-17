@@ -52,6 +52,7 @@ def q3():
 ---- Question 3 -----------------------------------------------------------
 • What is the distribution of the number of jobs/tasks per scheduling class? 
 """)
+    # process infos for jobs
     jobSchedulingClass = columnIndex['jobEvents']['scheduling class']
     jobID = columnIndex['jobEvents']['job ID']
 
@@ -63,6 +64,7 @@ def q3():
     for sc, count in sorted(jobsDistribuition):
         print(f"\t{count} jobs of scheduling class: {sc}")
     
+    # process infos for jobs
     print("")
     taskSchedulingClass = columnIndex['taskEvents']['scheduling class']
     taskIndex = columnIndex['taskEvents']['task index']
@@ -71,6 +73,7 @@ def q3():
     tasksBySC = taskEvents.map(lambda x: (int(x[taskIndex]), int(x[taskSchedulingClass]))).groupByKey().map(lambda x: (x[0], min(x[1])))
     # count tasks occurences
     tasksDistribuition = tasksBySC.map(lambda x: (x[1], 1)).reduceByKey(lambda a,b: a + b).collect()
+    
     for sc, count in sorted(tasksDistribuition):
         print(f"\t{count} tasks of scheduling class: {sc}")
 
@@ -80,6 +83,30 @@ def q4():
 ---- Question 4 -----------------------------------------------------------
 • Do tasks with a low scheduling class have a higher probability of being evicted?
 """)
+    taskSchedulingClass = columnIndex['taskEvents']['scheduling class']
+    jobID = columnIndex['taskEvents']['job ID']
+    taskIndex = columnIndex['taskEvents']['task index']
+    taskEventType = columnIndex['taskEvents']['event type']
+    
+    # select tuples (job, task) with low scheduling class
+    tasksLowSC = set(taskEvents.map(lambda x: (int(x[taskSchedulingClass]),
+        (int(x[jobID]), int(x[taskIndex])))).groupByKey().sortBy(lambda x:
+                x[0]).take(1)[0][1])
+    
+    # select tuples (job, task) that were evicted (event type := 2)
+    tasksEvicted = set(taskEvents.map(lambda x: (int(x[taskEventType]),
+        (int(x[jobID]), int(x[taskIndex])))).filter(lambda x: x[0] ==
+                2).map(lambda x: x[1]).collect())
+
+    def intersection(list_a, list_b):
+        return [ e for e in list_a if e in list_b ]
+
+    coverage = len(intersection(tasksLowSC, tasksEvicted)) / len(tasksEvicted)
+    if coverage > 0.5:
+        print(f"\tYes", end='')
+    else:
+        print(f"\tNo", end='')
+    print(f", {coverage*100:.2f}% of the tasks EVICTed have the lowest Scheduling Class")
 
 
 def q5():
@@ -114,6 +141,7 @@ def q6():
 ---- Question 6 -----------------------------------------------------------
 • Are the tasks that request the more resources the one that consume the more resources?
 """)
+    
 
 
 def q7():
@@ -125,10 +153,10 @@ def q7():
 
 if __name__ == "__main__":
 
-    q1()
+    #q1()
     #q2()
-    q3()
-    #q4()
+    #q3()
+    q4()
     #q5()
     #q6()
     #q7()

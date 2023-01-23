@@ -34,9 +34,9 @@ def q1():
     # select machineID and CPU capacity, group by machineID and select minimum capacity
     capacityByMachine = validEvents.map(lambda x: (int(x[machineID]), float(x[CPUs]))).groupByKey().map(lambda x: (x[0], min(x[1])))
     # count capacity occurences
-    capacityDistribuition = capacityByMachine.map(lambda x: (x[1], 1)).reduceByKey(lambda a,b: a + b).collect()
+    capacityDistribution = capacityByMachine.map(lambda x: (x[1], 1)).reduceByKey(lambda a,b: a + b).collect()
 
-    for capacity, count in sorted(capacityDistribuition):
+    for capacity, count in sorted(capacityDistribution):
         print(f"\t{count} machines with {capacity*100:.0f}% of CPU capacity")
 
 
@@ -59,12 +59,12 @@ def q3():
     # select jobsID and scheduling classes, group by joID and select minimum scheduling class
     jobsBySC = jobEvents.map(lambda x: (int(x[jobID]), int(x[jobSchedulingClass]))).groupByKey().map(lambda x: (x[0], min(x[1])))
     # count jobs occurences
-    jobsDistribuition = jobsBySC.map(lambda x: (x[1], 1)).reduceByKey(lambda a,b: a + b).collect()
+    jobsDistribution = jobsBySC.map(lambda x: (x[1], 1)).reduceByKey(lambda a,b: a + b).collect()
 
-    for sc, count in sorted(jobsDistribuition):
+    for sc, count in sorted(jobsDistribution):
         print(f"\t{count} jobs of scheduling class: {sc}")
     
-    # process infos for jobs
+    # process infos for tasks
     print("")
     taskSchedulingClass = columnIndex['taskEvents']['scheduling class']
     taskIndex = columnIndex['taskEvents']['task index']
@@ -72,9 +72,9 @@ def q3():
     # select task index and scheduling classes, group by task index and select minimum scheduling class
     tasksBySC = taskEvents.map(lambda x: (int(x[taskIndex]), int(x[taskSchedulingClass]))).groupByKey().map(lambda x: (x[0], min(x[1])))
     # count tasks occurences
-    tasksDistribuition = tasksBySC.map(lambda x: (x[1], 1)).reduceByKey(lambda a,b: a + b).collect()
+    tasksDistribution = tasksBySC.map(lambda x: (x[1], 1)).reduceByKey(lambda a,b: a + b).collect()
     
-    for sc, count in sorted(tasksDistribuition):
+    for sc, count in sorted(tasksDistribution):
         print(f"\t{count} tasks of scheduling class: {sc}")
 
 
@@ -115,25 +115,27 @@ def q5():
 • In general, do tasks from the same job run on the same machine?
 """)
     jobID = columnIndex['taskUsage']['job ID']
+    taskIndex = columnIndex['taskUsage']['task index']
     machineID = columnIndex['taskUsage']['machine ID']
 
-    # list of distinct job IDs (you can use [:10] to get a sample of 10 jobs, for exemple)
-    distinctJobs = taskUsage.map(lambda x: x[jobID]).distinct().collect()
-    # store percentage of tasks running on the same machine
-    tasksSameMachine = []
-    # for each job, return list of machines being used for the tasks
-    for job in distinctJobs:
-        machinesRunningJob = taskUsage.filter(lambda x: x[jobID] == job).map(lambda x: int(x[machineID])).collect()
-        # append the percentage of same machines being used (mode) over all the machines
-        tasksSameMachine.append(machinesRunningJob.count(mode(machinesRunningJob)) / len(machinesRunningJob))
+    machinesPerJobs = taskUsage.map(lambda x: (int(x[jobID]),
+        (int(x[taskIndex]), int(x[machineID])))).groupByKey().map(lambda x:
+                (x[0], set(x[1]))).collect()
     
+    percentagePerJob = []
+    for job, s in machinesPerJobs:
+        machines = [e[1] for e in s]
+        if len(machines) > 1:
+            percentagePerJob.append(machines.count(mode(machines)) / len(machines))
+
     # average usage of the same machine
-    meanPerJob = mean(tasksSameMachine)
+    meanPerJob = mean(percentagePerJob)
     if meanPerJob > 0.5:
         print(f"\tYes", end='')
     else:
         print(f"\tNo", end='')
-    print(f", usually {round(meanPerJob*100, 2)}% of tasks run on the same machine")
+    print(f", usually {round(meanPerJob*100, 2)}% of tasks from the same job run on the same machine")
+    print(f"\t(considering only jobs with more than 1 task)")
 
 
 def q6():
@@ -141,7 +143,91 @@ def q6():
 ---- Question 6 -----------------------------------------------------------
 • Are the tasks that request the more resources the one that consume the more resources?
 """)
+    taskCPURequest = columnIndex['taskEvents']['CPU request']
+    eventJobID = columnIndex['taskEvents']['job ID']
+    taskEventIndex = columnIndex['taskEvents']['task index']
+    taskCPURate = columnIndex['taskUsage']['CPU rate']
+    usageJobID = columnIndex['taskUsage']['job ID']
+    taskUsageIndex = columnIndex['taskUsage']['task index']
     
+    # select tuples (job, task) that request the more CPU
+    tasksRequestMore = taskEvents.map(lambda x: (x[taskCPURequest],
+        (int(x[eventJobID]), int(x[taskEventIndex])))).filter(lambda x: x[0] !=
+                '').map(lambda x: (float(x[0]), x[1])).sortBy(lambda x: x[0],
+                        False).map(lambda x: x[1]).take(100)
+    
+    # select tuples (job, task) that consume more resources
+    tasksConsumeMore = taskUsage.map(lambda x: ((int(x[usageJobID]), int(x[taskUsageIndex])),
+        float(x[taskCPURate]))).groupByKey().map(lambda x: (x[0],
+            mean(x[1]))).sortBy(lambda x: x[1], False).map(lambda x: x[0]).take(100)
+    
+    def intersection(list_a, list_b):
+        return [ e for e in list_a if e in list_b ]
+
+    coverage = len(intersection(tasksRequestMore, tasksConsumeMore)) / len(tasksConsumeMore)
+    if coverage > 0.5:
+        print(f"\tYes", end='')
+    else:
+        print(f"\tNo", end='')
+    print(f", {coverage*100:.2f}% of the tasks who consume more CPU have requested it the most")
+
+
+    taskMemoryRequest = columnIndex['taskEvents']['memory request']
+    eventJobID = columnIndex['taskEvents']['job ID']
+    taskEventIndex = columnIndex['taskEvents']['task index']
+    taskCanonicalMem = columnIndex['taskUsage']['canonical memory usage']
+    usageJobID = columnIndex['taskUsage']['job ID']
+    taskUsageIndex = columnIndex['taskUsage']['task index']
+    
+    # select tuples (job, task) that request the more memory
+    tasksRequestMore = taskEvents.map(lambda x: (x[taskMemoryRequest],
+        (int(x[eventJobID]), int(x[taskEventIndex])))).filter(lambda x: x[0] !=
+                '').map(lambda x: (float(x[0]), x[1])).sortBy(lambda x: x[0],
+                        False).map(lambda x: x[1]).take(100)
+    
+    # select tuples (job, task) that consume more resources
+    tasksConsumeMore = taskUsage.map(lambda x: ((int(x[usageJobID]), int(x[taskUsageIndex])),
+        float(x[taskCanonicalMem]))).groupByKey().map(lambda x: (x[0],
+            mean(x[1]))).sortBy(lambda x: x[1], False).map(lambda x: x[0]).take(100)
+    
+    def intersection(list_a, list_b):
+        return [ e for e in list_a if e in list_b ]
+
+    coverage = len(intersection(tasksRequestMore, tasksConsumeMore)) / len(tasksConsumeMore)
+    if coverage > 0.5:
+        print(f"\tYes", end='')
+    else:
+        print(f"\tNo", end='')
+    print(f", {coverage*100:.2f}% of the tasks who consume more memory have requested it the most")
+
+
+    taskDiskRequest = columnIndex['taskEvents']['disk space request']
+    eventJobID = columnIndex['taskEvents']['job ID']
+    taskEventIndex = columnIndex['taskEvents']['task index']
+    taskDiskUsage = columnIndex['taskUsage']['local disk space usage']
+    usageJobID = columnIndex['taskUsage']['job ID']
+    taskUsageIndex = columnIndex['taskUsage']['task index']
+    
+    # select tuples (job, task) that request the more disk space
+    tasksRequestMore = taskEvents.map(lambda x: (x[taskDiskRequest],
+        (int(x[eventJobID]), int(x[taskEventIndex])))).filter(lambda x: x[0] !=
+                '').map(lambda x: (float(x[0]), x[1])).sortBy(lambda x: x[0],
+                        False).map(lambda x: x[1]).take(100)
+    
+    # select tuples (job, task) that consume more resources
+    tasksConsumeMore = taskUsage.map(lambda x: ((int(x[usageJobID]), int(x[taskUsageIndex])),
+        float(x[taskDiskUsage]))).groupByKey().map(lambda x: (x[0],
+            mean(x[1]))).sortBy(lambda x: x[1], False).map(lambda x: x[0]).take(100)
+    
+    def intersection(list_a, list_b):
+        return [ e for e in list_a if e in list_b ]
+
+    coverage = len(intersection(tasksRequestMore, tasksConsumeMore)) / len(tasksConsumeMore)
+    if coverage > 0.5:
+        print(f"\tYes", end='')
+    else:
+        print(f"\tNo", end='')
+    print(f", {coverage*100:.2f}% of the tasks who consume more local disk space have requested it the most")
 
 
 def q7():
@@ -156,8 +242,8 @@ if __name__ == "__main__":
     #q1()
     #q2()
     #q3()
-    q4()
-    #q5()
+    #q4()
+    q5()
     #q6()
     #q7()
 

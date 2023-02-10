@@ -6,3 +6,24 @@ Project developed for the Large-scale Data Management and Distributed Systems co
 ## Dataset Schema
 
 ![](images/schema.png)
+
+## Usage
+
+### Cloning the repo
+
+```
+git clone git@github.com:gAkira/LSDM-Spark.git
+cd LSDM-Spark
+```
+
+### Download a sample of the dataset
+
+```
+bash download_data_sample.sh
+```
+
+### Run the Spark analysis
+
+```
+python3 navigation.py
+```

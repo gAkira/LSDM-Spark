@@ -96,7 +96,7 @@ def q4():
     # select tuples (job, task) that were evicted (event type := 2)
     tasksEvicted = set(taskEvents.map(lambda x: (int(x[taskEventType]),
         (int(x[jobID]), int(x[taskIndex])))).filter(lambda x: x[0] ==
-                2).map(lambda x: x[1]).collect())
+                JobEventType.EVICT).map(lambda x: x[1]).collect())
 
     def intersection(list_a, list_b):
         return [ e for e in list_a if e in list_b ]
@@ -118,10 +118,13 @@ def q5():
     taskIndex = columnIndex['taskUsage']['task index']
     machineID = columnIndex['taskUsage']['machine ID']
 
+    # select tuples (job, set(task, machine)) grouped by jobs
     machinesPerJobs = taskUsage.map(lambda x: (int(x[jobID]),
         (int(x[taskIndex]), int(x[machineID])))).groupByKey().map(lambda x:
                 (x[0], set(x[1]))).collect()
     
+    # calculate the percentage of the mode (of machineID) over the entire set
+    # for each job that scheduled more than one task
     percentagePerJob = []
     for job, s in machinesPerJobs:
         machines = [e[1] for e in s]
@@ -150,20 +153,20 @@ def q6():
     usageJobID = columnIndex['taskUsage']['job ID']
     taskUsageIndex = columnIndex['taskUsage']['task index']
     
+    def intersection(list_a, list_b):
+        return [ e for e in list_a if e in list_b ]
+    
     # select tuples (job, task) that request the more CPU
     tasksRequestMore = taskEvents.map(lambda x: (x[taskCPURequest],
         (int(x[eventJobID]), int(x[taskEventIndex])))).filter(lambda x: x[0] !=
                 '').map(lambda x: (float(x[0]), x[1])).sortBy(lambda x: x[0],
                         False).map(lambda x: x[1]).take(100)
     
-    # select tuples (job, task) that consume more resources
+    # select tuples (job, task) that consume more resources (CPU)
     tasksConsumeMore = taskUsage.map(lambda x: ((int(x[usageJobID]), int(x[taskUsageIndex])),
         float(x[taskCPURate]))).groupByKey().map(lambda x: (x[0],
             mean(x[1]))).sortBy(lambda x: x[1], False).map(lambda x: x[0]).take(100)
     
-    def intersection(list_a, list_b):
-        return [ e for e in list_a if e in list_b ]
-
     coverage = len(intersection(tasksRequestMore, tasksConsumeMore)) / len(tasksConsumeMore)
     if coverage > 0.5:
         print(f"\tYes", end='')
@@ -185,14 +188,11 @@ def q6():
                 '').map(lambda x: (float(x[0]), x[1])).sortBy(lambda x: x[0],
                         False).map(lambda x: x[1]).take(100)
     
-    # select tuples (job, task) that consume more resources
+    # select tuples (job, task) that consume more resources (Memory)
     tasksConsumeMore = taskUsage.map(lambda x: ((int(x[usageJobID]), int(x[taskUsageIndex])),
         float(x[taskCanonicalMem]))).groupByKey().map(lambda x: (x[0],
             mean(x[1]))).sortBy(lambda x: x[1], False).map(lambda x: x[0]).take(100)
     
-    def intersection(list_a, list_b):
-        return [ e for e in list_a if e in list_b ]
-
     coverage = len(intersection(tasksRequestMore, tasksConsumeMore)) / len(tasksConsumeMore)
     if coverage > 0.5:
         print(f"\tYes", end='')
@@ -214,14 +214,11 @@ def q6():
                 '').map(lambda x: (float(x[0]), x[1])).sortBy(lambda x: x[0],
                         False).map(lambda x: x[1]).take(100)
     
-    # select tuples (job, task) that consume more resources
+    # select tuples (job, task) that consume more resources (Disk space)
     tasksConsumeMore = taskUsage.map(lambda x: ((int(x[usageJobID]), int(x[taskUsageIndex])),
         float(x[taskDiskUsage]))).groupByKey().map(lambda x: (x[0],
             mean(x[1]))).sortBy(lambda x: x[1], False).map(lambda x: x[0]).take(100)
     
-    def intersection(list_a, list_b):
-        return [ e for e in list_a if e in list_b ]
-
     coverage = len(intersection(tasksRequestMore, tasksConsumeMore)) / len(tasksConsumeMore)
     if coverage > 0.5:
         print(f"\tYes", end='')
@@ -236,15 +233,71 @@ def q7():
 • Can we observe correlations between peaks of high resource consumption on some machines and task eviction events?
 """)
 
+    
+    def intersection(list_a, list_b):
+        return [ e for e in list_a if e in list_b ]
+    
+    time = columnIndex['taskEvents']['time']
+    eventType = columnIndex['taskEvents']['event type']
+    
+    # select moments of EVICTed tasks
+    timeEvict = taskEvents.filter(lambda x: int(x[eventType]) ==
+            JobEventType.EVICT).map(lambda x: x[time]).sortBy(lambda x:
+                    x[0]).collect()
+
+
+    taskCPURate = columnIndex['taskUsage']['CPU rate']
+    usageMachineID = columnIndex['taskUsage']['machine ID']
+    taskUsageIndex = columnIndex['taskUsage']['']
+    
+    def consumedResource(elem):
+        return sum([e[1] for e in elem])
+
+    # select tuples (job, task) that consume more resources (CPU)
+    timeConsumeMoreCPU = taskUsage.map(lambda x: (int(x[usageMachineID]),
+        int(x[taskUsageIndex]), float(x[taskCPURate]))).groupByKey().map()
+    #.map(lambda x: (x[0],
+     #       mean(x[1]))).sortBy(lambda x: x[1], False).map(lambda x: x[0]).take(100)
+    
+    print(timeConsumeMoreCPU.collect())
+
+    """
+    taskCanonicalMem = columnIndex['taskUsage']['canonical memory usage']
+    usageJobID = columnIndex['taskUsage']['job ID']
+    taskUsageIndex = columnIndex['taskUsage']['task index']
+    
+    # select tuples (job, task) that consume more resources (Memory)
+    timeConsumeMoreMemory = taskUsage.map(lambda x: ((int(x[usageJobID]), int(x[taskUsageIndex])),
+        float(x[taskCanonicalMem]))).groupByKey().map(lambda x: (x[0],
+            mean(x[1]))).sortBy(lambda x: x[1], False).map(lambda x: x[0]).take(100)
+    
+
+    taskDiskUsage = columnIndex['taskUsage']['local disk space usage']
+    usageJobID = columnIndex['taskUsage']['job ID']
+    taskUsageIndex = columnIndex['taskUsage']['task index']
+    
+    # select tuples (job, task) that consume more resources (disk)
+    timeConsumeMoreDisk = taskUsage.map(lambda x: ((int(x[usageJobID]), int(x[taskUsageIndex])),
+        float(x[taskDiskUsage]))).groupByKey().map(lambda x: (x[0],
+            mean(x[1]))).sortBy(lambda x: x[1], False).map(lambda x: x[0]).take(100)
+    
+
+    coverage = len(intersection(tasksRequestMore, tasksConsumeMore)) / len(tasksConsumeMore)
+    if coverage > 0.5:
+        print(f"\tYes", end='')
+    else:
+        print(f"\tNo", end='')
+    print(f", {coverage*100:.2f}% of the tasks who consume more local disk space have requested it the most")
+    """
 
 if __name__ == "__main__":
 
-    #q1()
+    q1()
     #q2()
-    #q3()
-    #q4()
+    q3()
+    q4()
     q5()
-    #q6()
+    q6()
     #q7()
 
     input("Press Enter to continue...")
